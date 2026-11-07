@@ -1,0 +1,122 @@
+name: u-boot
+
+# Builds HakiOS's U-Boot for the OnePlus 8 Pro (IN2020, instantnoodlep) and, as a sanity check that
+# hakios.patch still applies to a tree that compiles, for QEMU's virt machine.
+#
+# It replicates uefi/u-boot/apply.sh + uefi/u-boot/build.sh from the HakiOS base repository
+# (oosexgang/hakios-xnu-kernel): U-Boot at the release in uefi/u-boot/BASE (v2026.07), hakios.patch on
+# top, the common files of uefi/u-boot/files/, then every device's files/ on top of that. The OnePlus 8
+# Pro's own files live in ilmilm/hakios-oneplus8pro under u-boot/files/.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  UB_VER: v2026.07
+  UB_URL: https://github.com/u-boot/u-boot.git
+
+jobs:
+  oneplus8pro:
+    name: OnePlus 8 Pro (instantnoodlep)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the HakiOS device repository (device files at u-boot/files/)
+        uses: actions/checkout@v4
+        with:
+          repository: ilmilm/hakios-oneplus8pro
+          ref: main
+          path: device
+
+      - name: Check out the HakiOS base repository (uefi/u-boot + the other devices)
+        uses: actions/checkout@v4
+        with:
+          repository: oosexgang/hakios-xnu-kernel
+          ref: main
+          path: hakios
+
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc-aarch64-linux-gnu bison flex bc swig python3-dev
+
+      - name: U-Boot at ${{ env.UB_VER }} + hakios.patch (what uefi/u-boot/apply.sh does)
+        run: |
+          git clone -q --depth 1 -b "$UB_VER" "$UB_URL" u-boot
+          git -C u-boot apply --whitespace=nowarn hakios/uefi/u-boot/hakios.patch
+          cp -r hakios/uefi/u-boot/files/. u-boot/
+          cp -r hakios/devices/qemu/u-boot/files/. u-boot/
+          cp -r hakios/devices/redwood/u-boot/files/. u-boot/
+          cp -r device/u-boot/files/. u-boot/
+          echo "applied; device defconfig:" && ls u-boot/configs/
+
+      - name: Build hakios_oneplus8pro_defconfig
+        shell: bash
+        run: |
+          set -o pipefail
+          make -C u-boot -s O=build-oneplus8pro CROSS_COMPILE=aarch64-linux-gnu- hakios_oneplus8pro_defconfig
+          make -C u-boot -s O=build-oneplus8pro CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" 2>&1 | tee build-oneplus8pro.log
+
+      - name: Result
+        run: |
+          ls -la u-boot/build-oneplus8pro/u-boot.bin
+          sha256sum u-boot/build-oneplus8pro/u-boot.bin
+          cp u-boot/build-oneplus8pro/.config oneplus8pro.config
+          echo "## u-boot.bin (oneplus8pro)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          sha256sum u-boot/build-oneplus8pro/u-boot.bin >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot-oneplus8pro
+          if-no-files-found: error
+          path: |
+            u-boot/build-oneplus8pro/u-boot.bin
+            oneplus8pro.config
+            build-oneplus8pro.log
+
+  qemu:
+    name: QEMU virt (sanity of the patched tree)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the HakiOS base repository
+        uses: actions/checkout@v4
+        with:
+          repository: oosexgang/hakios-xnu-kernel
+          ref: main
+          path: hakios
+
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc-aarch64-linux-gnu bison flex bc swig python3-dev
+
+      - name: U-Boot at ${{ env.UB_VER }} + hakios.patch (what uefi/u-boot/apply.sh does)
+        run: |
+          git clone -q --depth 1 -b "$UB_VER" "$UB_URL" u-boot
+          git -C u-boot apply --whitespace=nowarn hakios/uefi/u-boot/hakios.patch
+          cp -r hakios/uefi/u-boot/files/. u-boot/
+          cp -r hakios/devices/qemu/u-boot/files/. u-boot/
+
+      - name: Build hakios_qemu_defconfig
+        shell: bash
+        run: |
+          set -o pipefail
+          make -C u-boot -s O=build-qemu CROSS_COMPILE=aarch64-linux-gnu- hakios_qemu_defconfig
+          make -C u-boot -s O=build-qemu CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" 2>&1 | tee build-qemu.log
+
+      - name: Result
+        run: |
+          ls -la u-boot/build-qemu/u-boot.bin
+          sha256sum u-boot/build-qemu/u-boot.bin
+
+      - name: Upload the artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot-qemu
+          if-no-files-found: error
+          path: |
+            u-boot/build-qemu/u-boot.bin
+            build-qemu.log
