@@ -6,7 +6,7 @@ name: u-boot
 # It replicates uefi/u-boot/apply.sh + uefi/u-boot/build.sh from the HakiOS repositories: U-Boot at the
 # release in uefi/u-boot/BASE (v2026.07), hakios.patch on top, the common files of uefi/u-boot/files/,
 # then every device's files/ on top of that. The pieces live in three repositories:
-#   - uefi/u-boot/{BASE,hakios.patch,files}  oosexgang/hakios-uefi
+#   - uefi/u-boot/{BASE,hakios.patch,files}  oosexgang/hakios-uefi (branch "u-boot", where that work lives)
 #   - devices/qemu/u-boot/files              oosexgang/hakios-xnu-kernel
 #   - devices/oneplus8pro/u-boot/files       ilmilm/hakios-oneplus8pro
 on:
@@ -17,6 +17,7 @@ on:
 env:
   UB_VER: v2026.07
   UB_URL: https://github.com/u-boot/u-boot.git
+  UEFI_REF: u-boot
 
 jobs:
   oneplus8pro:
@@ -34,7 +35,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: oosexgang/hakios-uefi
-          ref: main
+          ref: ${{ env.UEFI_REF }}
           path: uefi
 
       - name: Check out the HakiOS base repository (the other devices' files)
@@ -93,7 +94,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: oosexgang/hakios-uefi
-          ref: main
+          ref: ${{ env.UEFI_REF }}
           path: uefi
 
       - name: Check out the HakiOS base repository (devices/qemu)
