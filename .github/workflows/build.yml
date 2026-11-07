@@ -3,10 +3,12 @@ name: u-boot
 # Builds HakiOS's U-Boot for the OnePlus 8 Pro (IN2020, instantnoodlep) and, as a sanity check that
 # hakios.patch still applies to a tree that compiles, for QEMU's virt machine.
 #
-# It replicates uefi/u-boot/apply.sh + uefi/u-boot/build.sh from the HakiOS base repository
-# (oosexgang/hakios-xnu-kernel): U-Boot at the release in uefi/u-boot/BASE (v2026.07), hakios.patch on
-# top, the common files of uefi/u-boot/files/, then every device's files/ on top of that. The OnePlus 8
-# Pro's own files live in ilmilm/hakios-oneplus8pro under u-boot/files/.
+# It replicates uefi/u-boot/apply.sh + uefi/u-boot/build.sh from the HakiOS repositories: U-Boot at the
+# release in uefi/u-boot/BASE (v2026.07), hakios.patch on top, the common files of uefi/u-boot/files/,
+# then every device's files/ on top of that. The pieces live in three repositories:
+#   - uefi/u-boot/{BASE,hakios.patch,files}  oosexgang/hakios-uefi
+#   - devices/qemu/u-boot/files              oosexgang/hakios-xnu-kernel
+#   - devices/oneplus8pro/u-boot/files       ilmilm/hakios-oneplus8pro
 on:
   push:
   pull_request:
@@ -28,7 +30,14 @@ jobs:
           ref: main
           path: device
 
-      - name: Check out the HakiOS base repository (uefi/u-boot + the other devices)
+      - name: Check out the HakiOS uefi repository (uefi/u-boot)
+        uses: actions/checkout@v4
+        with:
+          repository: oosexgang/hakios-uefi
+          ref: main
+          path: uefi
+
+      - name: Check out the HakiOS base repository (the other devices' files)
         uses: actions/checkout@v4
         with:
           repository: oosexgang/hakios-xnu-kernel
@@ -43,12 +52,11 @@ jobs:
       - name: U-Boot at ${{ env.UB_VER }} + hakios.patch (what uefi/u-boot/apply.sh does)
         run: |
           git clone -q --depth 1 -b "$UB_VER" "$UB_URL" u-boot
-          git -C u-boot apply --whitespace=nowarn hakios/uefi/u-boot/hakios.patch
-          cp -r hakios/uefi/u-boot/files/. u-boot/
+          git -C u-boot apply --whitespace=nowarn uefi/u-boot/hakios.patch
+          cp -r uefi/u-boot/files/. u-boot/
           cp -r hakios/devices/qemu/u-boot/files/. u-boot/
-          cp -r hakios/devices/redwood/u-boot/files/. u-boot/
           cp -r device/u-boot/files/. u-boot/
-          echo "applied; device defconfig:" && ls u-boot/configs/
+          echo "applied; the defconfigs:" && ls u-boot/configs/ | grep hakios
 
       - name: Build hakios_oneplus8pro_defconfig
         shell: bash
@@ -81,7 +89,14 @@ jobs:
     name: QEMU virt (sanity of the patched tree)
     runs-on: ubuntu-24.04
     steps:
-      - name: Check out the HakiOS base repository
+      - name: Check out the HakiOS uefi repository (uefi/u-boot)
+        uses: actions/checkout@v4
+        with:
+          repository: oosexgang/hakios-uefi
+          ref: main
+          path: uefi
+
+      - name: Check out the HakiOS base repository (devices/qemu)
         uses: actions/checkout@v4
         with:
           repository: oosexgang/hakios-xnu-kernel
@@ -96,8 +111,8 @@ jobs:
       - name: U-Boot at ${{ env.UB_VER }} + hakios.patch (what uefi/u-boot/apply.sh does)
         run: |
           git clone -q --depth 1 -b "$UB_VER" "$UB_URL" u-boot
-          git -C u-boot apply --whitespace=nowarn hakios/uefi/u-boot/hakios.patch
-          cp -r hakios/uefi/u-boot/files/. u-boot/
+          git -C u-boot apply --whitespace=nowarn uefi/u-boot/hakios.patch
+          cp -r uefi/u-boot/files/. u-boot/
           cp -r hakios/devices/qemu/u-boot/files/. u-boot/
 
       - name: Build hakios_qemu_defconfig
