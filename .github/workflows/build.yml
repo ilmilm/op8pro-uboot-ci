@@ -53,7 +53,7 @@ jobs:
       - name: U-Boot at ${{ env.UB_VER }} + hakios.patch (what uefi/u-boot/apply.sh does)
         run: |
           git clone -q --depth 1 -b "$UB_VER" "$UB_URL" u-boot
-          git -C u-boot apply --whitespace=nowarn uefi/u-boot/hakios.patch
+          git -C u-boot apply --whitespace=nowarn "$GITHUB_WORKSPACE/uefi/u-boot/hakios.patch"
           cp -r uefi/u-boot/files/. u-boot/
           cp -r hakios/devices/qemu/u-boot/files/. u-boot/
           cp -r device/u-boot/files/. u-boot/
@@ -112,7 +112,7 @@ jobs:
       - name: U-Boot at ${{ env.UB_VER }} + hakios.patch (what uefi/u-boot/apply.sh does)
         run: |
           git clone -q --depth 1 -b "$UB_VER" "$UB_URL" u-boot
-          git -C u-boot apply --whitespace=nowarn uefi/u-boot/hakios.patch
+          git -C u-boot apply --whitespace=nowarn "$GITHUB_WORKSPACE/uefi/u-boot/hakios.patch"
           cp -r uefi/u-boot/files/. u-boot/
           cp -r hakios/devices/qemu/u-boot/files/. u-boot/
 
